@@ -21,7 +21,7 @@ def extract_zip(zip_path):
             os.remove(os.path.join(extract_path, file))
     else:
         os.makedirs(extract_path)
-            
+              
     with zipfile.ZipFile(zip_path, 'r') as zip_ref:
         zip_ref.extractall(extract_path)
     
@@ -43,18 +43,18 @@ def sort_files_by_type(directory):
     
     return txt_files, png_files, mp3_files
 
-@observe()
+@observe(name="analyze_txt_content_GPT")
 def analyze_txt_content(file_path):
     with open(file_path, 'r') as file:
         content = file.read()
         
     response = openai.chat.completions.create(
-        model="gpt-3.5-turbo",
+        model="gpt-4o",
         messages=[
             {"role": "system", "content": "Przeanalizuj poniższy tekst i określ czy zawiera informacje o: 1) schwytanych ludziach/śladach ich obecności, 2) naprawionych usterkach sprzętowych (hardware). Odpowiedz tylko: 'people', 'hardware' lub 'none'."},
             {"role": "user", "content": content}
         ],
-        name="content-classification",
+        name=(f"content-classification -- {file_path}"),
     )
     
     return response.choices[0].message.content.strip().lower(), os.path.basename(file_path)
