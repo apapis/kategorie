@@ -4,6 +4,7 @@ import os
 from langfuse.decorators import observe
 from langfuse.openai import openai
 from dotenv import load_dotenv
+import base64
 
 load_dotenv()
 
@@ -59,6 +60,39 @@ def analyze_txt_content(file_path):
     
     return response.choices[0].message.content.strip().lower(), os.path.basename(file_path)
 
+def encode_image(image_path):
+    with open(image_path, "rb") as image_file:
+        return base64.b64encode(image_file.read()).decode('utf-8')
+
+@observe(name="analyze_image_GPT")
+def analyze_image_content(file_path):
+    base64_image = encode_image(file_path)
+    
+    response = openai.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Przeanalizuj obraz i określ czy zawiera informacje o: 1) schwytanych ludziach/śladach ich obecności, 2) naprawionych usterkach sprzętowych (hardware). Odpowiedz tylko: 'people', 'hardware' lub 'none'."
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/png;base64,{base64_image}"
+                        }
+                    }
+                ]
+            }
+        ],
+        max_tokens=300,
+        name=f"image-classification -- {file_path}"
+    )
+    
+    return response.choices[0].message.content.strip().lower(), os.path.basename(file_path)
+
 def main():
     url = os.getenv('FILE_URL')
     zip_path = download_file(url)
@@ -74,8 +108,15 @@ def main():
     
     result = {"people": [], "hardware": []}
     
+    # Analiza plików tekstowych
     for txt_file in txt_files:
         category, filename = analyze_txt_content(txt_file)
+        if category in ["people", "hardware"]:
+            result[category].append(filename)
+
+    # Analiza obrazów
+    for png_file in png_files:
+        category, filename = analyze_image_content(png_file)
         if category in ["people", "hardware"]:
             result[category].append(filename)
     
